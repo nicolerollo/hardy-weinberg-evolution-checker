@@ -1,0 +1,159 @@
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+
+/**
+ * HardyWeinbergEvolutionChecker
+ *
+ * A generic Hardy–Weinberg and allele-frequency evolution analyzer.
+ * Users input recessive phenotype counts across generations, and
+ * the tool calculates allele/genotype frequencies and determines
+ * whether evolution (change in allele frequencies) is occurring.
+ *
+ * This version includes a continuous loop:
+ * the program will keep running new analyses until the user exits.
+ */
+public class HardyWeinbergEvolutionChecker {
+
+    private static final Scanner SCANNER = new Scanner(System.in);
+    private static final double EPSILON = 1e-6; // tolerance for detecting change
+
+    private static class GenerationData {
+        int generationIndex;
+        int total;
+        int recessiveCount;
+
+        double q2;     // phenotype frequency
+        double q;      // allele freq
+        double p;      // allele freq
+        double p2;     // genotype AA
+        double twoPq;  // genotype Aa
+        double q2geno; // genotype aa
+
+        GenerationData(int index, int total, int recessiveCount) {
+            this.generationIndex = index;
+            this.total = total;
+            this.recessiveCount = recessiveCount;
+            compute();
+        }
+
+        private void compute() {
+            this.q2 = recessiveCount / (double) total;
+            this.q = Math.sqrt(q2);
+            this.p = 1.0 - q;
+
+            this.p2 = p * p;
+            this.twoPq = 2 * p * q;
+            this.q2geno = q * q;
+        }
+    }
+
+    public static void main(String[] args) {
+        while (true) {
+            runAnalysis();
+
+            System.out.print("\nRun another analysis? (y/n): ");
+            String again = SCANNER.next().trim().toLowerCase();
+
+            if (!again.equals("y")) {
+                System.out.println("Exiting.");
+                break;
+            }
+
+            System.out.println("\n----------------------------------------\n");
+        }
+    }
+
+    private static void runAnalysis() {
+        System.out.println("=== Hardy–Weinberg Evolution Checker ===");
+        System.out.println("Input phenotype data across generations.");
+        System.out.println("Evolution = change in allele frequencies (p, q).\n");
+
+        int generations = readInt("Number of generations to analyze: ", 1, 10_000);
+        List<GenerationData> data = new ArrayList<>();
+
+        for (int g = 1; g <= generations; g++) {
+            System.out.println("\nGeneration " + g + ":");
+
+            int total = readInt("  Total population size (N): ", 1, Integer.MAX_VALUE);
+            int recessive = readInt("  Number with recessive phenotype (aa): ", 0, total);
+
+            data.add(new GenerationData(g, total, recessive));
+        }
+
+        printTables(data);
+        printEvolutionSummary(data);
+    }
+
+    // ---------- Output Tables ----------
+
+    private static void printTables(List<GenerationData> data) {
+        System.out.println("\n--- Table 1: Phenotype Data ---");
+        System.out.printf("%-6s %-10s %-18s %-10s%n",
+                "Gen", "Total(N)", "Recessive(aa)", "q^2");
+
+        for (GenerationData d : data) {
+            System.out.printf("%-6d %-10d %-18d %-10.4f%n",
+                    d.generationIndex, d.total, d.recessiveCount, d.q2);
+        }
+
+        System.out.println("\n--- Table 2: Allele & Genotype Frequencies ---");
+        System.out.printf("%-6s %-10s %-10s %-10s %-10s %-10s%n",
+                "Gen", "p^2(AA)", "2pq(Aa)", "q^2(aa)", "p", "q");
+
+        for (GenerationData d : data) {
+            System.out.printf("%-6d %-10.4f %-10.4f %-10.4f %-10.4f %-10.4f%n",
+                    d.generationIndex, d.p2, d.twoPq, d.q2geno, d.p, d.q);
+        }
+    }
+
+    private static void printEvolutionSummary(List<GenerationData> data) {
+        GenerationData first = data.get(0);
+        double p0 = first.p;
+        double q0 = first.q;
+
+        boolean evolutionDetected = false;
+
+        System.out.println("\n--- Allele Frequency Changes ---");
+        System.out.printf("%-6s %-10s %-10s %-10s %-10s%n",
+                "Gen", "p", "q", "Δp", "Δq");
+
+        for (GenerationData d : data) {
+            double deltaP = d.p - p0;
+            double deltaQ = d.q - q0;
+
+            if (Math.abs(deltaP) > EPSILON || Math.abs(deltaQ) > EPSILON) {
+                evolutionDetected = true;
+            }
+
+            System.out.printf("%-6d %-10.4f %-10.4f %-10.4f %-10.4f%n",
+                    d.generationIndex, d.p, d.q, deltaP, deltaQ);
+        }
+
+        System.out.println("\n--- Evolution Verdict ---");
+        if (evolutionDetected) {
+            System.out.println("Evolution is occurring: allele frequencies change across generations.");
+        } else {
+            System.out.println("No evidence of evolution: allele frequencies remained constant.");
+        }
+    }
+
+    // ---------- Input Helpers ----------
+
+    private static int readInt(String prompt, int min, int max) {
+        while (true) {
+            System.out.print(prompt);
+            if (!SCANNER.hasNextInt()) {
+                System.out.println("  Please enter an integer.");
+                SCANNER.next();
+                continue;
+            }
+            int value = SCANNER.nextInt();
+            if (value < min || value > max) {
+                System.out.printf("  Value must be between %d and %d.%n", min, max);
+                continue;
+            }
+            return value;
+        }
+    }
+}
